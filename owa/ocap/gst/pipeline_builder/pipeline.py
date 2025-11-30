@@ -8,7 +8,7 @@ TODO: supports various encoder depending on the platform and hardware
 BUG: mfh264enc only takes even-sized input, which causes d3d11convert to resize, which causes a char to be vague
 NOTE: If your desktop suffer with resource consumption, you may try h264 instead of h265.
 
-BUG: using mfaacenc along with nvd3d11h265enc causes a crash
+BUG: using mfaacenc along with hardware encoders can cause crashes (resolved by using software encoder)
 """
 
 from typing import Optional
@@ -71,10 +71,9 @@ def appsink_recorder_pipeline(
             screen_src |= (
                 "t. ! queue leaky=downstream ! d3d11download ! videoconvert ! fpsdisplaysink video-sink=fakesink"
             )
-        # in here, conversion to NV12 is required for nvd3d11h265enc to prevent alpha channel ignoring.
-        # also, usage of mfh264enc is avoided to prevent forceful odd-to-even resize.
-        # Related issue: https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/4124
-        screen_src |= "t. ! queue ! d3d11convert ! video/x-raw(memory:D3D11Memory),format=NV12 ! nvd3d11h265enc ! h265parse ! queue ! mux."
+        # Download from D3D11 memory to system memory for software encoding.
+        # Conversion to NV12 format for x265enc. x265enc supports flexible aspect ratios.
+        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x265enc ! h265parse ! queue ! mux."
         src |= screen_src
 
     if record_audio:
@@ -137,10 +136,9 @@ def subprocess_recorder_pipeline(
             screen_src |= (
                 "t. ! queue leaky=downstream ! d3d11download ! videoconvert ! fpsdisplaysink video-sink=fakesink"
             )
-        # in here, conversion to NV12 is required for nvd3d11h265enc to prevent alpha channel ignoring.
-        # also, usage of mfh264enc is avoided to prevent forceful odd-to-even resize.
-        # Related issue: https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/4124
-        screen_src |= "t. ! queue ! d3d11convert ! video/x-raw(memory:D3D11Memory),format=NV12 ! nvd3d11h265enc ! h265parse ! queue ! mux."
+        # Download from D3D11 memory to system memory for software encoding.
+        # Conversion to NV12 format for x265enc. x265enc supports flexible aspect ratios.
+        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x265enc ! h265parse ! queue ! mux."
         src |= screen_src
 
     if record_audio:
