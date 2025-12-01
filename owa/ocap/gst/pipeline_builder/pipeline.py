@@ -72,8 +72,9 @@ def appsink_recorder_pipeline(
                 "t. ! queue leaky=downstream ! d3d11download ! videoconvert ! fpsdisplaysink video-sink=fakesink"
             )
         # Download from D3D11 memory to system memory for software encoding.
-        # Conversion to NV12 format for x265enc. x265enc supports flexible aspect ratios.
-        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x265enc ! h265parse ! queue ! mux."
+        # Conversion to NV12 format for x264enc. x264enc supports flexible aspect ratios.
+        # Performance tuning: tune=zerolatency and speed-preset=ultrafast for real-time encoding on limited CPU resources.
+        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! queue ! mux."
         src |= screen_src
 
     if record_audio:
@@ -137,8 +138,9 @@ def subprocess_recorder_pipeline(
                 "t. ! queue leaky=downstream ! d3d11download ! videoconvert ! fpsdisplaysink video-sink=fakesink"
             )
         # Download from D3D11 memory to system memory for software encoding.
-        # Conversion to NV12 format for x265enc. x265enc supports flexible aspect ratios.
-        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x265enc ! h265parse ! queue ! mux."
+        # Conversion to NV12 format for x264enc. x264enc supports flexible aspect ratios.
+        # Performance tuning: tune=zerolatency and speed-preset=ultrafast for real-time encoding on limited CPU resources.
+        screen_src |= "t. ! queue ! d3d11download ! videoconvert ! video/x-raw,format=NV12 ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! queue ! mux."
         src |= screen_src
 
     if record_audio:
