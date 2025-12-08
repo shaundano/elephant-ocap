@@ -106,6 +106,7 @@ def setup_resources(
     width: Optional[int],
     height: Optional[int],
     additional_properties: dict,
+    record_mic: bool,
 ):
     """Set up and manage all recording resources (listeners, recorder, etc.)."""
     check_plugin()
@@ -154,6 +155,7 @@ def setup_resources(
         height=height,
         additional_properties=additional_properties,
         callback=screen_callback,
+        record_mic=record_mic,
     )
 
     resources = [
@@ -285,6 +287,7 @@ def record(
     record_timestamp: Annotated[bool, typer.Option(help="Whether to record timestamp")] = True,
     show_cursor: Annotated[bool, typer.Option(help="Whether to show the cursor in the capture")] = True,
     fps: Annotated[float, typer.Option(help="Video frame rate. Default is 60 fps.")] = 60.0,
+    record_mic: Annotated[bool, typer.Option(help="Whether to record microphone input as separate audio track")] = True,
     # Capture source options
     window_name: Annotated[
         Optional[str], typer.Option(help="Window name to capture. Supports substring matching.")
@@ -308,42 +311,54 @@ def record(
         float, typer.Option(help="Interval in seconds for checking resource health. Set to 0 to disable.")
     ] = 5.0,
 ):
-    """Record screen, keyboard, mouse, and window events to an `.mcap` and `.mkv` file."""
-    # Setup output files and recording context
+    """Record screen, keyboard, mouse, and window events to an `.mcap` and `.mkv` file.
+    
+    Audio tracks in MKV:
+    - Track 0: Desktop/system audio (when record_audio=True)
+    - Track 1: Microphone input (when record_mic=True)
+    """
     output_file = ensure_output_files_ready(file_location)
     context = RecordingContext(output_file)
-    additional_properties = parse_additional_properties(additional_args)
+    pid_file = Path(r"C:\scripts\pid\ocap.pid")
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    pid_file.write_text(str(os.getpid()))
 
-    # Display warnings and instructions
-    _display_warnings_and_instructions(window_name)
+    try:
+        additional_properties = parse_additional_properties(additional_args)
 
-    # Handle delayed start if requested
-    if start_after:
-        countdown_delay(start_after)
+        # Display warnings and instructions
+        _display_warnings_and_instructions(window_name)
 
-    # Start recording with all configured resources
-    with setup_resources(
-        context=context,
-        record_audio=record_audio,
-        record_video=record_video,
-        record_timestamp=record_timestamp,
-        show_cursor=show_cursor,
-        fps=fps,
-        window_name=window_name,
-        monitor_idx=monitor_idx,
-        width=width,
-        height=height,
-        additional_properties=additional_properties,
-    ) as resources:
-        with OWAMcapWriter(output_file) as writer:
-            # Record environment metadata
-            _record_environment_metadata(writer)
+        # Handle delayed start if requested
+        if start_after:
+            countdown_delay(start_after)
 
-            # Run the main recording loop
-            _run_recording_loop(context, writer, resources, stop_after, health_check_interval)
+        # Start recording with all configured resources
+        with setup_resources(
+            context=context,
+            record_audio=record_audio,
+            record_video=record_video,
+            record_timestamp=record_timestamp,
+            show_cursor=show_cursor,
+            fps=fps,
+            window_name=window_name,
+            monitor_idx=monitor_idx,
+            width=width,
+            height=height,
+            additional_properties=additional_properties,
+            record_mic=record_mic,
+        ) as resources:
+            with OWAMcapWriter(output_file) as writer:
+                # Record environment metadata
+                _record_environment_metadata(writer)
 
-            # Resources are cleaned up by context managers
-            logger.info(f"Output file saved to {output_file}")
+                # Run the main recording loop
+                _run_recording_loop(context, writer, resources, stop_after, health_check_interval)
+
+                # Resources are cleaned up by context managers
+                logger.info(f"Output file saved to {output_file}")
+    finally:
+        pid_file.unlink(missing_ok=True)
 
 
 # ============================================================================
